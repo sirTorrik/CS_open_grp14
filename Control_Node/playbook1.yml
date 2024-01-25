@@ -1,0 +1,79 @@
+---
+- name: Manage Docker Container for Web Server
+  hosts: instances
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Read Username from File
+      set_fact:
+        username: "{{ lookup('file', 'username.txt') }}"
+
+    - name: Grab Port
+      set_fact:
+        port: "{{ lookup('file', 'port.txt') }}"
+
+    - name: Grab Email
+      set_fact:
+        email: "{{ lookup('file', 'email.txt') }}"
+
+    - name: Starting Docker Daemon
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+
+    - name: Create Docker Bridge Network
+      docker_network:
+        name: "{{ username }}_network"
+        state: present
+
+    - name: Pull a Docker Image
+      docker_image:
+        name: "httpd"
+        tag: "latest"
+        source: pull
+      register: z
+
+    - name: Checking Pull Status
+      debug:
+        var: z
+
+    - name: Create User Directory
+      file:
+        path: "/users/{{ username }}"
+        state: directory
+
+#    - name: Copy HTML files from S3 bucket
+#      command: "aws s3 sync s3://your-s3-bucket/{{ username }}/ /users/{{ username }}/"
+#      environment:
+#        AWS_ACCESS_KEY_ID: "{{ your_aws_access_key }}"
+#        AWS_SECRET_ACCESS_KEY: "{{ your_aws_secret_key }}"
+
+    - name: Launching an HTTPD Container
+      when: z.failed == false
+      docker_container:
+        name: "{{ username }}-apache-server"
+        image: "httpd"
+        state: "started"
+        network_mode: "{{ username }}_network"
+        exposed_ports:
+          - "80"
+        ports:
+          - "{{ port }}:80"
+        volumes:
+          - "/users/{{ username }}:/usr/local/apache2/htdocs"
+
+    - name: Send Port Info and Email
+      uri:
+        url: https://nvqxmj0ff9.execute-api.eu-central-1.amazonaws.com/Email-2
+        method: POST
+        body: "{{ {'port': port, 'email': email} | to_json }}"
+        body_format: json
+        return_content: true  # Include this line for debugging
+        status_code: 200
+      delegate_to: localhost
+
+    
+

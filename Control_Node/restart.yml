@@ -1,0 +1,26 @@
+---
+- name: Manage Docker Container for Web Server
+  hosts: instances
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Read Username from File
+      set_fact:
+        username: "{{ lookup('file', 'username.txt') }}"
+
+  #- name: Download File from S3
+      #command: "aws s3 cp s3://your-s3-bucket/your-file /users/{{ username }}/your-file"
+      #args:
+       # executable: /bin/bash
+
+
+    - name: Restart Docker Container
+      command: "docker restart {{ username }}-apache-server"
+      become: true
+      ignore_errors: yes
+
+
+
+
+
